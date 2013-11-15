@@ -95,9 +95,6 @@ class GraspStabilityControlUI:
         self.window.set_title("Grasp Stability Estimation Dummy UI")
         self.window.resize(500, 230)
         
-        self.add_context('left_gripper')
-        self.remove_context('left_gripper')
-        
         gtk.gdk.threads_init()
         thread.start_new_thread(self.spinner, ())
         
