@@ -2,14 +2,18 @@
 
 import rospy
 from grasp_stability_msgs.msg import GraspStability
+from grasp_stability_msgs.srv import *
 import gtk
 import pygtk
+import thread
+import threading
 
 
 class GraspStabilityControlUI:
     def __init__(self):
         rospy.init_node('grasp_stability_estimator');
         self.pubState = rospy.Publisher('/grasp_stability_estimator/state', GraspStability);
+        self.srvControl = rospy.Service('/grasp_stability_estimator/control', Control, self.control_callback)
         
         # The window
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -23,9 +27,18 @@ class GraspStabilityControlUI:
         # The publish button
         self.button_publish = gtk.Button("Publish")
         self.button_publish.connect("clicked", self.click_publish, None)
+        self.button_publish.set_sensitive(False)
         
         # The context list
-        self.context_list = gtk.TreeView(gtk.ListStore(str))
+        self.list_store = gtk.ListStore(str)
+        self.context_list = gtk.TreeView(self.list_store)
+        col = gtk.TreeViewColumn('Context ID')
+        cell = gtk.CellRendererText()
+        self.context_list.append_column(col)
+        col.pack_start(cell, 0)
+        col.set_attributes(cell, text=0)
+        list_selection = self.context_list.get_selection()
+        list_selection.connect("changed", self.context_list_selection_changed)
         
         # The quit/publish hbox
         self.hbox2 = gtk.HBox(False, 0)
@@ -48,12 +61,19 @@ class GraspStabilityControlUI:
         # Text boxes and labels
         self.hbox_conf = gtk.HBox(False, 0)
         self.lbl_graspconf = gtk.Label("Confidence: ")
-        #self.txt_graspconf = gtk.EditField("")
+        self.txt_graspconf = gtk.Entry(0)
         self.hbox_conf.pack_start(self.lbl_graspconf, False, False, 5)
+        self.hbox_conf.pack_start(self.txt_graspconf, False, False, 5)
+        self.txt_graspconf.set_text('0.95')
+        self.txt_graspconf.set_width_chars(5)
+        
         self.hbox_qual = gtk.HBox(False, 0)
-        self.lbl_qual = gtk.Label("Quality: ")
-        #self.txt_graspconf = gtk.EditField("")
-        self.hbox_qual.pack_start(self.lbl_qual, False, False, 5)
+        self.lbl_graspqual = gtk.Label("Quality: ")
+        self.txt_graspqual = gtk.Entry(0)
+        self.hbox_qual.pack_start(self.lbl_graspqual, False, False, 5)
+        self.hbox_qual.pack_start(self.txt_graspqual, False, False, 5)
+        self.txt_graspqual.set_text('0.73')
+        self.txt_graspqual.set_width_chars(5)
         
         # The settings vbox
         self.vbox2 = gtk.VBox(False, 0)
@@ -73,12 +93,47 @@ class GraspStabilityControlUI:
         self.window.show_all()
         
         self.window.set_title("Grasp Stability Estimation Dummy UI")
-        self.window.resize(640, 480)
+        self.window.resize(500, 230)
+        
+        self.add_context('left_gripper')
+        self.remove_context('left_gripper')
+        
+        gtk.gdk.threads_init()
+        thread.start_new_thread(self.spinner, ())
         
         gtk.main()
         
         pass;
     
+    def spinner(self):
+        rospy.spin()
+    
+    def control_callback(self, req):
+        if req.command == 0:
+            self.add_context(req.measurement_context_id)
+        elif req.command == 1:
+            self.remove_context(req.measurement_context_id)
+        
+        ctrlRet = ControlResponse()
+        ctrlRet.result = 1;
+        
+        return ctrlRet
+        
+    
+    def context_list_selection_changed(self, list_selection):
+        (model, pathlist) = list_selection.get_selected_rows()
+        value = ''
+        
+        if len(pathlist) > 0:
+            list_iter = model.get_iter(pathlist[0])
+            value = model.get_value(list_iter, 0)
+        
+        self.context_selected = value
+        if self.context_selected == '':
+            self.button_publish.set_sensitive(False)
+        else:
+            self.button_publish.set_sensitive(True)
+
     def delete_event(self, widget, event, data=None):
         return False
     
@@ -97,9 +152,9 @@ class GraspStabilityControlUI:
         elif self.button_graspcat_bad.get_active():
             grasp_cat = 3
         
-        grasp_quality = 0.95
-        estimation_confidence = 0.73
-        measurement_context_id = 'test-id'
+        grasp_quality = float(self.txt_graspqual.get_text())
+        estimation_confidence = float(self.txt_graspconf.get_text())
+        measurement_context_id = self.context_selected
         
         rospy.sleep(0.1)
         self.publish(grasp_cat, grasp_quality, estimation_confidence, measurement_context_id)
@@ -120,6 +175,15 @@ class GraspStabilityControlUI:
                 self.button_graspcat_good.set_active(False)
                 self.button_graspcat_medium.set_active(False)
     
+    def add_context(self, context):
+        self.context_list.get_model().append([context])
+        
+    def remove_context(self, context):
+        for row in self.list_store:
+            if row[0] == context:
+                self.list_store.remove(row.iter)
+                break
+
     def destroy(self, widget, data=None):
         self.quit()
 
