@@ -76,7 +76,7 @@ add_executable(grasp_stability_estimator_node
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-add_dependencies(grasp_stability_estimator_node grasp_stability_msgs_gencpp)
+add_dependencies(grasp_stability_estimator_node grasp_stability_msgs_gencpp grasp_stability_msgs_genpy)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(grasp_stability_estimator_node
