@@ -12,11 +12,12 @@ import threading
 class GraspStabilityControlUI:
     def __init__(self):
         rospy.init_node('grasp_stability_estimator');
-        self.pubState = rospy.Publisher('/grasp_stability_estimator/state', GraspStability);
+        self.pubState = rospy.Publisher('/grasp_stability_estimator/state', GraspStability, latch=True);
         self.srvControl = rospy.Service('/grasp_stability_estimator/control', Control, self.control_callback)
         
         # The window
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.window.set_keep_above(True)
         self.window.connect("delete_event", self.delete_event)
         self.window.connect("destroy", self.destroy)
         
@@ -29,6 +30,10 @@ class GraspStabilityControlUI:
         self.button_publish.connect("clicked", self.click_publish, None)
         self.button_publish.set_sensitive(False)
         
+        # The reset button
+        self.button_reset = gtk.Button("Reset")
+        self.button_reset.connect("clicked", self.click_reset, None)
+        
         # The context list
         self.list_store = gtk.ListStore(str)
         self.context_list = gtk.TreeView(self.list_store)
@@ -40,10 +45,11 @@ class GraspStabilityControlUI:
         list_selection = self.context_list.get_selection()
         list_selection.connect("changed", self.context_list_selection_changed)
         
-        # The quit/publish hbox
+        # The quit/publish/reset hbox
         self.hbox2 = gtk.HBox(False, 0)
         self.hbox2.pack_start(self.button_quit, False, False, 5)
         self.hbox2.pack_start(self.button_publish, True, True, 5)
+        self.hbox2.pack_start(self.button_reset, True, True, 5)
         
         # The list/quit/publish vbox
         self.vbox1 = gtk.VBox(False, 0)
@@ -139,6 +145,9 @@ class GraspStabilityControlUI:
     
     def click_quit(self, widget, data=None):
         self.quit()
+
+    def click_reset(self, widget, data=None):
+        self.list_store.clear()
 
     def click_publish(self, widget, data=None):
         grasp_cat = 0
